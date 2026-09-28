@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Noon Marketplace & Noon Seller Lab Replica + Mock API
 
-## Getting Started
+A replica of **Noon Marketplace (`noon.com`)**, **Noon Seller Lab (`seller.noon.com` / `login.noon.partners`)**, and **Noon Seller Partner REST APIs**, designed for testing, developing, and publishing a **Zoho CRM Connector Extension** via **Zoho Sigma / Zoho Developer**.
 
-First, run the development server:
+---
+
+## 🌟 What This Project Provides
+
+1. **Noon Consumer Storefront (`/`)**:
+   - Signature Noon Yellow (`#FEEE00`) & dark charcoal design system.
+   - Real Middle East products in **AED** / **SAR** with Noon Express badges.
+   - Interactive Cart and Checkout simulation (Dubai/Riyadh addresses, Card & COD).
+   - Placing orders updates the shared database in real-time and fires webhooks.
+
+2. **Noon Seller Lab Portal (`/seller`)**:
+   - **Dashboard**: Live sales metrics, order counts, fulfillment status, and inventory alerts.
+   - **Orders & Fulfillment**: Manage orders by status (`PENDING`, `CONFIRMED`, `PACKED`, `SHIPPED`, `DELIVERED`, `CANCELLED`), generate and print authentic **Noon Air Waybill (AWB)** shipping labels.
+   - **Catalog & Stock Control**: Real-time stock and price adjustments to test two-way inventory sync.
+   - **API Credentials**: Seller Identifier (`noon_seller_uae_88921`), API Key, Project ID, and downloadable `store_credentials.json`.
+   - **Zoho CRM Webhook Manager**: Configure webhook target URLs and test dispatch with live HTTP status codes.
+   - **Zoho Deluge & Sigma Guide**: Complete copy-paste Deluge scripts for scheduled sync, webhook handlers, and inventory updates.
+   - **Interactive API Console**: Test endpoints with pre-filled tokens and cURL commands right in your browser.
+
+3. **Noon Seller REST APIs (`/api/v1/*`)**:
+   - `GET /api/v1/seller/profile`: Test connection endpoint for Zoho CRM extension settings.
+   - `GET /api/v1/orders`: List paginated orders with status filters.
+   - `GET /api/v1/orders/[orderId]`: Full order details, line items, and customer address.
+   - `PUT /api/v1/orders/[orderId]/status`: Update order fulfillment status from Zoho CRM.
+   - `GET /api/v1/orders/[orderId]/awb`: Generate printable HTML shipping labels.
+   - `GET /api/v1/catalog`: Fetch product list, barcodes, and stock levels.
+   - `PUT /api/v1/catalog/stock`: Two-way stock synchronization.
+   - `PUT /api/v1/catalog/price`: Price updates.
+   - `POST /api/v1/webhooks/test`: Dispatch sample webhooks to Zoho CRM.
+
+---
+
+## 🚀 Quick Start (Local Development)
 
 ```bash
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Open in browser:
+# Consumer Storefront: http://localhost:3000
+# Seller Lab Portal:   http://localhost:3000/seller
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## ☁️ Deploy to Vercel (1-Click)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Push this repository to GitHub.
+2. Import the repo at [vercel.com/new](https://vercel.com/new).
+3. Click **Deploy**. No special environment variables are needed!
+4. Use your Vercel URL (`https://your-app.vercel.app`) as the `noon_base_url` in Zoho Sigma!
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📖 Zoho Integration Guide
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See [ZOHO_INTEGRATION_GUIDE.md](file:///d:/noon/ZOHO_INTEGRATION_GUIDE.md) for full Deluge scripts and step-by-step instructions on setting up Zoho Sigma.
