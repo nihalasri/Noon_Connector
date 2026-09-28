@@ -344,10 +344,10 @@ export const INITIAL_ORDERS: Order[] = [
 ];
 
 export const INITIAL_SELLER_CONFIG: SellerConfig = {
-  seller_identifier: 'noon_seller_uae_88921',
-  api_key: 'noon_live_9f82d1c73a4b08e6f152d399104cba7e',
-  project_id: 'noon-partner-uae',
-  store_name: 'Apex Retail UAE',
+  seller_identifier: process.env.NOON_SELLER_IDENTIFIER || 'noon_seller_uae_88921',
+  api_key: process.env.NOON_API_KEY || 'noon_live_9f82d1c73a4b08e6f152d399104cba7e',
+  project_id: process.env.NOON_PROJECT_ID || 'noon-partner-uae',
+  store_name: process.env.NOON_STORE_NAME || 'Apex Retail UAE',
   legal_name: 'Apex Global E-Commerce LLC',
   email: 'seller@apexretail.ae',
   phone: '+971 4 388 9000',
@@ -355,8 +355,8 @@ export const INITIAL_SELLER_CONFIG: SellerConfig = {
   city: 'Dubai',
   currency: 'AED',
   vat_number: '100293847500003',
-  webhook_url: '',
-  webhook_secret: 'whsec_noon_zoho_998124a91cf2e45',
+  webhook_url: process.env.NOON_WEBHOOK_URL || '',
+  webhook_secret: process.env.NOON_WEBHOOK_SECRET || 'whsec_noon_zoho_998124a91cf2e45',
   webhook_events: ['order.created', 'order.status_updated', 'inventory.stock_updated']
 };
 
