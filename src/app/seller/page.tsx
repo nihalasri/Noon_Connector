@@ -6,7 +6,8 @@ import {
   Building2, Package, ShoppingCart, Key, Webhook, Code, Play, 
   RefreshCw, Check, Copy, ExternalLink, Printer, CheckCircle2,
   AlertCircle, ChevronRight, Download, Send, ArrowUpRight, Plus,
-  Sliders, Search, Filter, ShieldCheck, Database, Layers, Users, Server, HardDrive
+  Sliders, Search, Filter, ShieldCheck, Database, Layers, Users, Server, HardDrive,
+  Edit, X, Image as ImageIcon
 } from 'lucide-react';
 import { Order, Product, SellerConfig, WebhookLog, OrderStatus, CustomerRecord, DbStatusInfo } from '@/lib/types';
 
@@ -37,6 +38,37 @@ export default function SellerPortalPage() {
   // Stock edit state
   const [editingStockSku, setEditingStockSku] = useState<string | null>(null);
   const [newStockVal, setNewStockVal] = useState<number>(0);
+
+  // Product Add / Edit Modal State
+  const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productForm, setProductForm] = useState<{
+    title: string;
+    brand: string;
+    category: string;
+    price: number | string;
+    original_price: number | string;
+    stock: number | string;
+    sku: string;
+    barcode: string;
+    image: string;
+    description: string;
+    is_express: boolean;
+  }>({
+    title: '',
+    brand: '',
+    category: 'Electronics',
+    price: '',
+    original_price: '',
+    stock: 25,
+    sku: '',
+    barcode: '',
+    image: '',
+    description: '',
+    is_express: true
+  });
+  const [isSavingProduct, setIsSavingProduct] = useState<boolean>(false);
+  const [productFormError, setProductFormError] = useState<string | null>(null);
 
   // API Sandbox State
   const [sandboxEndpoint, setSandboxEndpoint] = useState<string>('/api/v1/orders?demo=true');
@@ -170,6 +202,92 @@ export default function SellerPortalPage() {
       }
     } catch (err: any) {
       alert('Error: ' + err.message);
+    }
+  };
+
+  const handleOpenAddProductModal = () => {
+    setEditingProduct(null);
+    setProductFormError(null);
+    const randomSku = `N${Math.floor(10000000 + Math.random() * 90000000)}A`;
+    const randomEan = `629${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+    setProductForm({
+      title: '',
+      brand: '',
+      category: 'Electronics',
+      price: '',
+      original_price: '',
+      stock: 25,
+      sku: randomSku,
+      barcode: randomEan,
+      image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80',
+      description: '',
+      is_express: true
+    });
+    setIsProductModalOpen(true);
+  };
+
+  const handleOpenEditProductModal = (prod: Product) => {
+    setEditingProduct(prod);
+    setProductFormError(null);
+    setProductForm({
+      title: prod.title,
+      brand: prod.brand,
+      category: prod.category,
+      price: prod.price,
+      original_price: prod.original_price || prod.price,
+      stock: prod.stock,
+      sku: prod.sku,
+      barcode: prod.barcode || '',
+      image: prod.image,
+      description: prod.description || '',
+      is_express: prod.is_express ?? true
+    });
+    setIsProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productForm.title.trim()) {
+      setProductFormError('Please enter a product title');
+      return;
+    }
+    if (!productForm.price || Number(productForm.price) <= 0) {
+      setProductFormError('Please enter a valid price greater than 0');
+      return;
+    }
+
+    setIsSavingProduct(true);
+    setProductFormError(null);
+
+    try {
+      const isEditing = !!editingProduct;
+      const url = '/api/v1/catalog?demo=true';
+      const method = isEditing ? 'PUT' : 'POST';
+      const payload = {
+        ...productForm,
+        price: Number(productForm.price),
+        original_price: Number(productForm.original_price || productForm.price),
+        stock: Number(productForm.stock || 0)
+      };
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setIsProductModalOpen(false);
+        setEditingProduct(null);
+        await loadAllData(false);
+      } else {
+        setProductFormError(data.message || 'Failed to save product');
+      }
+    } catch (err: any) {
+      setProductFormError('Error saving product: ' + err.message);
+    } finally {
+      setIsSavingProduct(false);
     }
   };
 
@@ -990,13 +1108,35 @@ export default function SellerPortalPage() {
           {/* TAB 3: CATALOG & STOCK */}
           {activeTab === 'catalog' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#ffffff' }}>Catalog & Stock Control</h1>
                   <p style={{ fontSize: '14px', color: '#9aa5b8' }}>
-                    Adjust SKU inventory levels to test two-way stock synchronization with Zoho CRM.
+                    Adjust SKU inventory levels, add new products, or edit details for two-way synchronization.
                   </p>
                 </div>
+                <button
+                  onClick={handleOpenAddProductModal}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#feee00',
+                    color: '#000000',
+                    border: 'none',
+                    padding: '9px 16px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 10px rgba(254, 238, 0, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                >
+                  <Plus size={16} /> Add New Product
+                </button>
               </div>
 
               <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', overflow: 'hidden' }}>
@@ -1008,7 +1148,7 @@ export default function SellerPortalPage() {
                       <th style={{ padding: '12px 16px' }}>Category</th>
                       <th style={{ padding: '12px 16px' }}>Selling Price</th>
                       <th style={{ padding: '12px 16px' }}>Stock Available</th>
-                      <th style={{ padding: '12px 16px' }}>Quick Adjust</th>
+                      <th style={{ padding: '12px 16px' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1065,24 +1205,47 @@ export default function SellerPortalPage() {
                           )}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
-                          {editingStockSku !== prod.sku && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
-                              onClick={() => {
-                                setEditingStockSku(prod.sku);
-                                setNewStockVal(prod.stock);
-                              }}
+                              onClick={() => handleOpenEditProductModal(prod)}
                               style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '5px',
                                 background: '#242933',
-                                color: '#c0c8d6',
-                                border: '1px solid #333a47',
-                                padding: '4px 10px',
-                                borderRadius: '4px',
-                                fontSize: '11px'
+                                color: '#e2e8f0',
+                                border: '1px solid #3b4252',
+                                padding: '5px 10px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'background 0.15s'
                               }}
+                              title="Edit product details, price, images & description"
                             >
-                              Edit Stock
+                              <Edit size={12} style={{ color: '#feee00' }} /> Edit Details
                             </button>
-                          )}
+                            {editingStockSku !== prod.sku && (
+                              <button
+                                onClick={() => {
+                                  setEditingStockSku(prod.sku);
+                                  setNewStockVal(prod.stock);
+                                }}
+                                style={{
+                                  background: '#1a1d24',
+                                  color: '#8c95a6',
+                                  border: '1px solid #2d3340',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Edit Stock
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2163,6 +2326,463 @@ info syncResponse;`}
 
         </main>
       </div>
+
+      {/* ADD / EDIT PRODUCT MODAL */}
+      {isProductModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#15171d',
+            border: '1px solid #2e3440',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '680px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+            position: 'relative'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '20px 24px',
+              borderBottom: '1px solid #242933',
+              position: 'sticky',
+              top: 0,
+              background: '#15171d',
+              zIndex: 10
+            }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {editingProduct ? <Edit size={18} style={{ color: '#feee00' }} /> : <Plus size={18} style={{ color: '#feee00' }} />}
+                  {editingProduct ? 'Edit Product Details' : 'Add New Product to Noon Catalog'}
+                </h2>
+                <p style={{ fontSize: '12px', color: '#8c95a6', margin: '3px 0 0 0' }}>
+                  {editingProduct
+                    ? `Updating SKU: ${editingProduct.sku} • Changes immediately persist to Vercel Postgres`
+                    : 'Create a new catalog item with instant storefront & database persistence.'}
+                </p>
+              </div>
+              <button
+                onClick={() => setIsProductModalOpen(false)}
+                style={{
+                  background: '#242933',
+                  border: 'none',
+                  color: '#8c95a6',
+                  borderRadius: '8px',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveProduct} style={{ padding: '24px' }}>
+              {productFormError && (
+                <div style={{
+                  background: '#451b1d',
+                  border: '1px solid #f87171',
+                  color: '#fca5a5',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  marginBottom: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={16} />
+                  {productFormError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Title */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                    Product Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={productForm.title}
+                    onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
+                    placeholder="e.g. Apple iPhone 16 Pro Max 256GB Desert Titanium"
+                    style={{
+                      width: '100%',
+                      background: '#1d212a',
+                      border: '1px solid #333a47',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      color: '#fff',
+                      fontSize: '13px'
+                    }}
+                  />
+                </div>
+
+                {/* Brand & Category */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                      Brand Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={productForm.brand}
+                      onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })}
+                      placeholder="e.g. Apple, Nike, Sony, Dior"
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#fff',
+                        fontSize: '13px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                      Category *
+                    </label>
+                    <select
+                      value={productForm.category}
+                      onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#fff',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <option value="Mobiles">Mobiles</option>
+                      <option value="Electronics">Electronics</option>
+                      <option value="Fragrances">Fragrances</option>
+                      <option value="Fashion">Fashion</option>
+                      <option value="Home">Home</option>
+                      <option value="Beauty">Beauty</option>
+                      <option value="Sports">Sports</option>
+                      <option value="General">General</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Selling Price & Original Price */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#feee00', marginBottom: '6px' }}>
+                      Selling Price (AED) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={productForm.price}
+                      onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
+                      placeholder="e.g. 4799"
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#feee00',
+                        fontWeight: '700',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                      Compare / Original Price (AED)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={productForm.original_price}
+                      onChange={(e) => setProductForm({ ...productForm, original_price: e.target.value })}
+                      placeholder="e.g. 5099"
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#9aa5b8',
+                        fontSize: '13px'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Stock Quantity & SKU */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#4ade80', marginBottom: '6px' }}>
+                      Inventory Stock (Units) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={productForm.stock}
+                      onChange={(e) => setProductForm({ ...productForm, stock: e.target.value })}
+                      placeholder="e.g. 25"
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#4ade80',
+                        fontWeight: '700',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                      SKU Code {editingProduct ? '(Read Only)' : '(Auto-generated)'}
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!!editingProduct}
+                      value={productForm.sku}
+                      onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                      placeholder="e.g. N53346824A"
+                      style={{
+                        width: '100%',
+                        background: editingProduct ? '#13151a' : '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: editingProduct ? '#717d91' : '#fff',
+                        fontFamily: 'monospace',
+                        fontSize: '13px',
+                        cursor: editingProduct ? 'not-allowed' : 'text'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Barcode & Express Badge */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'center' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                      Barcode / EAN
+                    </label>
+                    <input
+                      type="text"
+                      value={productForm.barcode}
+                      onChange={(e) => setProductForm({ ...productForm, barcode: e.target.value })}
+                      placeholder="e.g. 629110034521"
+                      style={{
+                        width: '100%',
+                        background: '#1d212a',
+                        border: '1px solid #333a47',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        color: '#fff',
+                        fontSize: '13px'
+                      }}
+                    />
+                  </div>
+                  <div style={{ paddingTop: '18px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: '#fff', fontSize: '13px', fontWeight: '600' }}>
+                      <input
+                        type="checkbox"
+                        checked={productForm.is_express}
+                        onChange={(e) => setProductForm({ ...productForm, is_express: e.target.checked })}
+                        style={{ width: '18px', height: '18px', accentColor: '#feee00' }}
+                      />
+                      <span>⚡ Noon Express Eligible</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Image URL & Live Preview */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                    Product Image URL
+                  </label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="text"
+                        value={productForm.image}
+                        onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                        placeholder="https://images.unsplash.com/..."
+                        style={{
+                          width: '100%',
+                          background: '#1d212a',
+                          border: '1px solid #333a47',
+                          borderRadius: '8px',
+                          padding: '10px 14px',
+                          color: '#fff',
+                          fontSize: '13px',
+                          marginBottom: '8px'
+                        }}
+                      />
+                      {/* Presets */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11px', color: '#717d91', alignSelf: 'center' }}>Presets:</span>
+                        {[
+                          { label: '📱 Phone', url: 'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?auto=format&fit=crop&w=600&q=80' },
+                          { label: '🎧 Headset', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80' },
+                          { label: '👟 Shoes', url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80' },
+                          { label: '🧴 Perfume', url: 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&w=600&q=80' },
+                          { label: '⌚ Watch', url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80' },
+                          { label: '☕ Coffee', url: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?auto=format&fit=crop&w=600&q=80' }
+                        ].map((preset, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setProductForm({ ...productForm, image: preset.url })}
+                            style={{
+                              background: '#242933',
+                              color: '#c0c8d6',
+                              border: '1px solid #333a47',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Preview Box */}
+                    <div style={{
+                      width: '64px',
+                      height: '64px',
+                      background: '#1d212a',
+                      border: '1px solid #333a47',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      flexShrink: 0
+                    }}>
+                      {productForm.image ? (
+                        <img
+                          src={productForm.image}
+                          alt="Preview"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80';
+                          }}
+                        />
+                      ) : (
+                        <ImageIcon size={24} style={{ color: '#555e70' }} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#c0c8d6', marginBottom: '6px' }}>
+                    Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={productForm.description}
+                    onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                    placeholder="Enter detailed specifications or product highlights..."
+                    style={{
+                      width: '100%',
+                      background: '#1d212a',
+                      border: '1px solid #333a47',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      resize: 'vertical'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Form Buttons */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                marginTop: '24px',
+                paddingTop: '16px',
+                borderTop: '1px solid #242933'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setIsProductModalOpen(false)}
+                  style={{
+                    background: '#242933',
+                    color: '#c0c8d6',
+                    border: '1px solid #333a47',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProduct}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#feee00',
+                    color: '#000',
+                    border: 'none',
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '800',
+                    cursor: isSavingProduct ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 2px 10px rgba(254, 238, 0, 0.3)',
+                    opacity: isSavingProduct ? 0.7 : 1
+                  }}
+                >
+                  {isSavingProduct ? <RefreshCw size={15} className="spin" /> : <Check size={16} />}
+                  {editingProduct ? 'Save Product Changes' : 'Create Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -6,6 +6,7 @@ import {
   updateProductStockInDb,
   updateProductPriceInDb,
   addProductInDb,
+  updateProductInDb,
   getCustomersFromDb,
   upsertCustomerInDb,
   getOrdersFromDb,
@@ -47,6 +48,10 @@ export async function updateProductPrice(sku: string, newPrice: number): Promise
 
 export async function addProduct(product: Product): Promise<Product> {
   return addProductInDb(product);
+}
+
+export async function updateProduct(sku: string, updates: Partial<Product>): Promise<Product | null> {
+  return updateProductInDb(sku, updates);
 }
 
 // Customer operations

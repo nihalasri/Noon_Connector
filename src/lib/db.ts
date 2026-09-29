@@ -546,9 +546,15 @@ export async function addProductInDb(product: Product): Promise<Product> {
         )
         ON CONFLICT (sku) DO UPDATE SET
           title = EXCLUDED.title,
+          brand = EXCLUDED.brand,
+          category = EXCLUDED.category,
           price = EXCLUDED.price,
+          original_price = EXCLUDED.original_price,
           stock = EXCLUDED.stock,
           image = EXCLUDED.image,
+          barcode = EXCLUDED.barcode,
+          description = EXCLUDED.description,
+          is_express = EXCLUDED.is_express,
           updated_at = CURRENT_TIMESTAMP
       `;
       return product;
@@ -558,8 +564,64 @@ export async function addProductInDb(product: Product): Promise<Product> {
   }
 
   const store = getMemoryStore();
-  store.products.unshift(product);
+  const existingIdx = store.products.findIndex(p => p.sku.toUpperCase() === product.sku.toUpperCase());
+  if (existingIdx >= 0) {
+    store.products[existingIdx] = { ...store.products[existingIdx], ...product };
+  } else {
+    store.products.unshift(product);
+  }
   return product;
+}
+
+export async function updateProductInDb(sku: string, updates: Partial<Product>): Promise<Product | null> {
+  const ready = await ensureDatabaseReady();
+  const connStr = getConnectionString();
+
+  if (ready && connStr) {
+    try {
+      const sql = neon(connStr);
+      const existingRows = await sql`SELECT * FROM noon_products WHERE UPPER(sku) = UPPER(${sku}) LIMIT 1`;
+      if (existingRows.length === 0) return null;
+
+      const current = mapDbProduct(existingRows[0]);
+      const merged: Product = {
+        ...current,
+        ...updates,
+        sku: current.sku // keep SKU immutable
+      };
+
+      const rows = await sql`
+        UPDATE noon_products SET
+          title = ${merged.title},
+          title_ar = ${merged.title_ar || merged.title},
+          brand = ${merged.brand},
+          category = ${merged.category},
+          price = ${merged.price},
+          original_price = ${merged.original_price || merged.price},
+          stock = ${merged.stock},
+          image = ${merged.image},
+          barcode = ${merged.barcode || ''},
+          description = ${merged.description || ''},
+          is_express = ${merged.is_express ?? true},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE UPPER(sku) = UPPER(${sku})
+        RETURNING *
+      `;
+
+      if (rows.length > 0) {
+        return mapDbProduct(rows[0]);
+      }
+      return null;
+    } catch (err) {
+      console.error(`Error updating product ${sku} in Vercel DB:`, err);
+    }
+  }
+
+  const store = getMemoryStore();
+  const index = store.products.findIndex(p => p.sku.toUpperCase() === sku.toUpperCase());
+  if (index === -1) return null;
+  store.products[index] = { ...store.products[index], ...updates };
+  return store.products[index];
 }
 
 // -------------------------------------------------------------
