@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
-import { getSellerConfig, dispatchWebhook, getOrders } from '@/lib/store';
+import { getSellerConfig, updateSellerConfig, dispatchWebhook, getOrders } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   const auth = authenticateRequest(req);
@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
       },
       { status: 400 }
     );
+  }
+
+  // Ensure this URL is stored permanently in the database
+  if (bodyUrl && bodyUrl.startsWith('http') && bodyUrl !== config.webhook_url) {
+    try {
+      await updateSellerConfig({ webhook_url: bodyUrl });
+    } catch (saveErr) {
+      console.error('Failed to auto-save webhook URL to DB during test:', saveErr);
+    }
   }
 
   const orderResult = await getOrders({ limit: 1 });

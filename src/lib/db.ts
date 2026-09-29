@@ -1119,24 +1119,42 @@ export async function getSellerConfigFromDb(): Promise<SellerConfig> {
   if (ready && connStr) {
     try {
       const sql = neon(connStr);
-      const rows = await sql`SELECT * FROM noon_sellers LIMIT 1`;
+      const rows = await sql`SELECT * FROM noon_sellers ORDER BY updated_at DESC NULLS LAST LIMIT 1`;
       if (rows.length > 0) {
         const r = rows[0];
+        const fallbackUrl = INITIAL_SELLER_CONFIG.webhook_url || '';
+        const webhookUrl = (r.webhook_url && r.webhook_url.trim().length > 0)
+          ? r.webhook_url.trim()
+          : fallbackUrl;
+
+        // Auto-heal empty webhook_url in Postgres
+        if ((!r.webhook_url || r.webhook_url.trim().length === 0) && fallbackUrl) {
+          try {
+            await sql`
+              UPDATE noon_sellers SET
+                webhook_url = ${fallbackUrl},
+                updated_at = CURRENT_TIMESTAMP
+            `;
+          } catch (healErr) {
+            console.error('Failed to auto-heal webhook_url in DB:', healErr);
+          }
+        }
+
         const config: SellerConfig = {
-          seller_identifier: r.seller_identifier,
-          api_key: r.api_key,
-          project_id: r.project_id,
-          store_name: r.store_name,
-          legal_name: r.legal_name,
-          email: r.email,
-          phone: r.phone,
-          country: r.country,
-          city: r.city,
-          currency: r.currency,
-          vat_number: r.vat_number || '',
-          webhook_url: r.webhook_url || '',
-          webhook_secret: r.webhook_secret || '',
-          webhook_events: Array.isArray(r.webhook_events) ? r.webhook_events : []
+          seller_identifier: r.seller_identifier || INITIAL_SELLER_CONFIG.seller_identifier,
+          api_key: r.api_key || INITIAL_SELLER_CONFIG.api_key,
+          project_id: r.project_id || INITIAL_SELLER_CONFIG.project_id,
+          store_name: r.store_name || INITIAL_SELLER_CONFIG.store_name,
+          legal_name: r.legal_name || INITIAL_SELLER_CONFIG.legal_name,
+          email: r.email || INITIAL_SELLER_CONFIG.email,
+          phone: r.phone || INITIAL_SELLER_CONFIG.phone,
+          country: r.country || INITIAL_SELLER_CONFIG.country,
+          city: r.city || INITIAL_SELLER_CONFIG.city,
+          currency: r.currency || INITIAL_SELLER_CONFIG.currency,
+          vat_number: r.vat_number || INITIAL_SELLER_CONFIG.vat_number,
+          webhook_url: webhookUrl,
+          webhook_secret: r.webhook_secret || INITIAL_SELLER_CONFIG.webhook_secret,
+          webhook_events: Array.isArray(r.webhook_events) ? r.webhook_events : INITIAL_SELLER_CONFIG.webhook_events
         };
         getMemoryStore().sellerConfig = config;
         return config;
@@ -1151,7 +1169,31 @@ export async function getSellerConfigFromDb(): Promise<SellerConfig> {
 
 export async function updateSellerConfigInDb(updates: Partial<SellerConfig>): Promise<SellerConfig> {
   const current = await getSellerConfigFromDb();
-  const merged: SellerConfig = { ...current, ...updates };
+
+  // Filter out undefined and null values
+  const cleanUpdates: Partial<SellerConfig> = {};
+  for (const [key, val] of Object.entries(updates)) {
+    if (val !== undefined && val !== null) {
+      (cleanUpdates as any)[key] = val;
+    }
+  }
+
+  const merged: SellerConfig = {
+    seller_identifier: cleanUpdates.seller_identifier || current.seller_identifier || INITIAL_SELLER_CONFIG.seller_identifier,
+    api_key: cleanUpdates.api_key || current.api_key || INITIAL_SELLER_CONFIG.api_key,
+    project_id: cleanUpdates.project_id || current.project_id || INITIAL_SELLER_CONFIG.project_id,
+    store_name: cleanUpdates.store_name || current.store_name || INITIAL_SELLER_CONFIG.store_name,
+    legal_name: cleanUpdates.legal_name || current.legal_name || INITIAL_SELLER_CONFIG.legal_name,
+    email: cleanUpdates.email || current.email || INITIAL_SELLER_CONFIG.email,
+    phone: cleanUpdates.phone || current.phone || INITIAL_SELLER_CONFIG.phone,
+    country: cleanUpdates.country || current.country || INITIAL_SELLER_CONFIG.country,
+    city: cleanUpdates.city || current.city || INITIAL_SELLER_CONFIG.city,
+    currency: cleanUpdates.currency || current.currency || INITIAL_SELLER_CONFIG.currency,
+    vat_number: cleanUpdates.vat_number !== undefined ? cleanUpdates.vat_number : (current.vat_number || INITIAL_SELLER_CONFIG.vat_number),
+    webhook_url: cleanUpdates.webhook_url !== undefined ? cleanUpdates.webhook_url : (current.webhook_url || INITIAL_SELLER_CONFIG.webhook_url),
+    webhook_secret: cleanUpdates.webhook_secret !== undefined ? cleanUpdates.webhook_secret : (current.webhook_secret || INITIAL_SELLER_CONFIG.webhook_secret),
+    webhook_events: Array.isArray(cleanUpdates.webhook_events) ? cleanUpdates.webhook_events : (current.webhook_events || INITIAL_SELLER_CONFIG.webhook_events)
+  };
 
   const ready = await ensureDatabaseReady();
   const connStr = getConnectionString();
@@ -1190,6 +1232,7 @@ export async function updateSellerConfigInDb(updates: Partial<SellerConfig>): Pr
       }
     } catch (err) {
       console.error('Error updating seller config in Vercel DB:', err);
+      throw err;
     }
   }
 
