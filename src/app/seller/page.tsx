@@ -29,6 +29,7 @@ export default function SellerPortalPage() {
 
   // Webhook settings form state
   const [webhookUrlInput, setWebhookUrlInput] = useState<string>('');
+  const [isEditingWebhook, setIsEditingWebhook] = useState<boolean>(false);
   const [isSavingWebhook, setIsSavingWebhook] = useState<boolean>(false);
   const [saveWebhookStatus, setSaveWebhookStatus] = useState<{ loading: boolean; message?: string; success?: boolean } | null>(null);
   const [testWebhookStatus, setTestWebhookStatus] = useState<{ loading: boolean; message?: string; success?: boolean } | null>(null);
@@ -119,11 +120,16 @@ export default function SellerPortalPage() {
       }
 
       if (configRes.status === 'fulfilled' && configRes.value?.success) {
-        setConfig(configRes.value.config);
+        const c = configRes.value.config;
+        setConfig(c);
         // Only initialize input on initial load if user has not typed into it
         if (!isWebhookInitializedRef.current && !isWebhookDirtyRef.current) {
-          setWebhookUrlInput(configRes.value.config.webhook_url || '');
+          const url = c.webhook_url || '';
+          setWebhookUrlInput(url);
+          setIsEditingWebhook(!url);
           isWebhookInitializedRef.current = true;
+        } else if (!isWebhookDirtyRef.current && c.webhook_url && !isEditingWebhook) {
+          setWebhookUrlInput(c.webhook_url);
         }
       }
 
@@ -327,12 +333,13 @@ export default function SellerPortalPage() {
       if (data.success) {
         setConfig(data.config);
         setWebhookUrlInput(data.config.webhook_url || '');
+        setIsEditingWebhook(false);
         isWebhookDirtyRef.current = false;
         isWebhookInitializedRef.current = true;
         setSaveWebhookStatus({
           loading: false,
           success: true,
-          message: '✅ Webhook URL saved successfully!'
+          message: '✅ Webhook URL saved permanently to Postgres!'
         });
         setTimeout(() => setSaveWebhookStatus(null), 4000);
       } else {
@@ -1467,11 +1474,43 @@ export default function SellerPortalPage() {
               <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '12px', padding: '24px', marginBottom: '28px' }}>
                 <form onSubmit={handleSaveWebhookSettings}>
                   <div style={{ marginBottom: '16px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#fff', display: 'block', marginBottom: '6px' }}>
-                      Target Zoho Webhook Endpoint URL
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
+                        Target Zoho Webhook Endpoint URL
+                      </label>
+                      {config?.webhook_url && !isEditingWebhook ? (
+                        <span style={{
+                          background: '#064e3b',
+                          color: '#6ee7b7',
+                          border: '1px solid #059669',
+                          padding: '3px 10px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px'
+                        }}>
+                          🔒 Saved & Active in Postgres
+                        </span>
+                      ) : (
+                        <span style={{
+                          background: '#3b2f0a',
+                          color: '#fef08a',
+                          border: '1px solid #ca8a04',
+                          padding: '3px 10px',
+                          borderRadius: '4px',
+                          fontSize: '11px',
+                          fontWeight: '700'
+                        }}>
+                          ✏️ Editing Webhook URL
+                        </span>
+                      )}
+                    </div>
+
                     <input
                       type="url"
+                      readOnly={!isEditingWebhook && !!config?.webhook_url}
                       placeholder="https://crm.zoho.com/crm/WebHook?id=... or Deluge webhook URL"
                       value={webhookUrlInput}
                       onChange={(e) => {
@@ -1484,27 +1523,81 @@ export default function SellerPortalPage() {
                       style={{
                         width: '100%',
                         padding: '10px 14px',
-                        background: '#0d0e12',
-                        border: '1px solid #282c35',
+                        background: (!isEditingWebhook && config?.webhook_url) ? '#0d1017' : '#0d0e12',
+                        border: (!isEditingWebhook && config?.webhook_url) ? '1px solid #1e3a29' : '1px solid #feee00',
                         borderRadius: '6px',
-                        color: '#fff',
-                        fontSize: '13px'
+                        color: (!isEditingWebhook && config?.webhook_url) ? '#4ade80' : '#fff',
+                        fontFamily: (!isEditingWebhook && config?.webhook_url) ? 'monospace' : 'inherit',
+                        fontSize: '13px',
+                        cursor: (!isEditingWebhook && config?.webhook_url) ? 'default' : 'text'
                       }}
                     />
-                    <span style={{ fontSize: '12px', color: '#687284', marginTop: '4px', display: 'block' }}>
+                    <span style={{ fontSize: '12px', color: '#687284', marginTop: '6px', display: 'block' }}>
                       When a customer buys on the Noon storefront, a POST request is sent to this URL with the order details.
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      type="submit"
-                      disabled={isSavingWebhook}
-                      className="btn-noon-primary"
-                      style={{ fontSize: '13px', padding: '8px 18px' }}
-                    >
-                      {isSavingWebhook ? 'Saving...' : 'Save Webhook URL'}
-                    </button>
+                    {config?.webhook_url && !isEditingWebhook ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingWebhook(true);
+                          isWebhookDirtyRef.current = true;
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#feee00',
+                          color: '#000',
+                          border: 'none',
+                          padding: '8px 18px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(254, 238, 0, 0.25)',
+                          transition: 'transform 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'translateY(0)')}
+                      >
+                        <Edit size={14} /> Change
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="submit"
+                          disabled={isSavingWebhook}
+                          className="btn-noon-primary"
+                          style={{ fontSize: '13px', padding: '8px 18px', cursor: 'pointer' }}
+                        >
+                          {isSavingWebhook ? 'Saving to Database...' : 'Save Webhook URL'}
+                        </button>
+                        {config?.webhook_url && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setWebhookUrlInput(config.webhook_url || '');
+                              setIsEditingWebhook(false);
+                              isWebhookDirtyRef.current = false;
+                            }}
+                            style={{
+                              background: '#242933',
+                              color: '#8c95a6',
+                              border: '1px solid #333a47',
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </>
+                    )}
 
                     <button
                       type="button"
@@ -1518,7 +1611,8 @@ export default function SellerPortalPage() {
                         fontSize: '13px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        cursor: 'pointer'
                       }}
                     >
                       <Send size={14} />

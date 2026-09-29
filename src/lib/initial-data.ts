@@ -354,7 +354,7 @@ export const INITIAL_SELLER_CONFIG: SellerConfig = {
   city: 'Dubai',
   currency: 'AED',
   vat_number: '100293847500003',
-  webhook_url: process.env.NOON_WEBHOOK_URL || '',
+  webhook_url: process.env.NOON_WEBHOOK_URL || 'https://plugin-noonhub.zohosandbox.com/crm/v7/functions/noonhub__noon_webhook/actions/execute?auth_type=apikey&zapikey=1003.662060449fd491e02e33e5889a891cb1.0c069787925cc32521baef8c502aad73',
   webhook_secret: process.env.NOON_WEBHOOK_SECRET || 'whsec_noon_zoho_998124a91cf2e45',
   webhook_events: ['order.created', 'order.status_updated', 'inventory.stock_updated']
 };

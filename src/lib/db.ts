@@ -1159,7 +1159,7 @@ export async function updateSellerConfigInDb(updates: Partial<SellerConfig>): Pr
   if (ready && connStr) {
     try {
       const sql = neon(connStr);
-      await sql`
+      const rows = await sql`
         UPDATE noon_sellers SET
           store_name = ${merged.store_name},
           legal_name = ${merged.legal_name},
@@ -1170,8 +1170,24 @@ export async function updateSellerConfigInDb(updates: Partial<SellerConfig>): Pr
           webhook_secret = ${merged.webhook_secret},
           webhook_events = ${JSON.stringify(merged.webhook_events)}::jsonb,
           updated_at = CURRENT_TIMESTAMP
-        WHERE seller_identifier = ${merged.seller_identifier}
+        RETURNING *
       `;
+
+      if (rows.length === 0) {
+        await sql`
+          INSERT INTO noon_sellers (
+            seller_identifier, api_key, project_id, store_name,
+            legal_name, email, phone, country, city, currency,
+            vat_number, webhook_url, webhook_secret, webhook_events
+          ) VALUES (
+            ${merged.seller_identifier}, ${merged.api_key}, ${merged.project_id},
+            ${merged.store_name}, ${merged.legal_name}, ${merged.email},
+            ${merged.phone}, ${merged.country}, ${merged.city},
+            ${merged.currency}, ${merged.vat_number}, ${merged.webhook_url},
+            ${merged.webhook_secret}, ${JSON.stringify(merged.webhook_events)}::jsonb
+          )
+        `;
+      }
     } catch (err) {
       console.error('Error updating seller config in Vercel DB:', err);
     }
