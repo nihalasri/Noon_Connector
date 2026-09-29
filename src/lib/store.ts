@@ -13,6 +13,7 @@ import {
   getOrderByIdFromDb,
   createOrderInDb,
   updateOrderStatusInDb,
+  deleteOrderInDb,
   getSellerConfigFromDb,
   getSellerConfigSyncFromDb,
   updateSellerConfigInDb,
@@ -86,6 +87,10 @@ export async function updateOrderStatus(
   extra?: { tracking_number?: string; carrier?: string }
 ): Promise<Order | null> {
   return updateOrderStatusInDb(orderId, newStatus, extra);
+}
+
+export async function deleteOrder(orderId: string): Promise<boolean> {
+  return deleteOrderInDb(orderId);
 }
 
 // Seller Config operations

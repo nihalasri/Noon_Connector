@@ -1072,6 +1072,39 @@ export async function updateOrderStatusInDb(
   return order;
 }
 
+export async function deleteOrderInDb(orderId: string): Promise<boolean> {
+  const ready = await ensureDatabaseReady();
+  const connStr = getConnectionString();
+
+  if (ready && connStr) {
+    try {
+      const sql = neon(connStr);
+      await sql`DELETE FROM noon_order_items WHERE UPPER(order_id) = UPPER(${orderId}) OR order_id = ${orderId}`;
+      const rows = await sql`
+        DELETE FROM noon_orders 
+        WHERE UPPER(order_id) = UPPER(${orderId}) OR order_nr = ${orderId}
+        RETURNING order_id
+      `;
+
+      const store = getMemoryStore();
+      const idx = store.orders.findIndex(o => o.order_id.toUpperCase() === orderId.toUpperCase() || o.order_nr === orderId);
+      if (idx !== -1) store.orders.splice(idx, 1);
+
+      return rows.length > 0;
+    } catch (err) {
+      console.error(`Error deleting order ${orderId} from Vercel DB:`, err);
+    }
+  }
+
+  const store = getMemoryStore();
+  const idx = store.orders.findIndex(o => o.order_id.toUpperCase() === orderId.toUpperCase() || o.order_nr === orderId);
+  if (idx !== -1) {
+    store.orders.splice(idx, 1);
+    return true;
+  }
+  return false;
+}
+
 // -------------------------------------------------------------
 // SELLER CONFIG OPERATIONS
 // -------------------------------------------------------------

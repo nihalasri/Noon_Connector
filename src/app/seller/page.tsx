@@ -7,7 +7,7 @@ import {
   RefreshCw, Check, Copy, ExternalLink, Printer, CheckCircle2,
   AlertCircle, ChevronRight, Download, Send, ArrowUpRight, Plus,
   Sliders, Search, Filter, ShieldCheck, Database, Layers, Users, Server, HardDrive,
-  Edit, X, Image as ImageIcon
+  Edit, X, Image as ImageIcon, Trash2
 } from 'lucide-react';
 import { Order, Product, SellerConfig, WebhookLog, OrderStatus, CustomerRecord, DbStatusInfo } from '@/lib/types';
 
@@ -183,6 +183,27 @@ export default function SellerPortalPage() {
       }
     } catch (err: any) {
       alert('Error updating status: ' + err.message);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm(`Are you sure you want to permanently delete order ${orderId} from the database?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/orders/${orderId}?demo=true`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(prev => prev.filter(o => o.order_id !== orderId));
+        loadAllData(false);
+      } else {
+        alert('Failed to delete order: ' + data.message);
+      }
+    } catch (err: any) {
+      alert('Error deleting order: ' + err.message);
     }
   };
 
@@ -1088,12 +1109,31 @@ export default function SellerPortalPage() {
                                     border: '1px solid #451b1d',
                                     padding: '4px 8px',
                                     borderRadius: '4px',
-                                    fontSize: '10px'
+                                    fontSize: '10px',
+                                    cursor: 'pointer'
                                   }}
                                 >
                                   Cancel Order
                                 </button>
                               )}
+                              <button
+                                onClick={() => handleDeleteOrder(order.order_id)}
+                                style={{
+                                  background: 'transparent',
+                                  color: '#ef4444',
+                                  border: '1px solid #7f1d1d',
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  cursor: 'pointer'
+                                }}
+                                title="Permanently delete order from database"
+                              >
+                                <Trash2 size={11} /> Delete
+                              </button>
                             </div>
                           </td>
                         </tr>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
-import { getOrders, createOrder } from '@/lib/store';
+import { getOrders, createOrder, deleteOrder } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -69,4 +69,46 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(req: NextRequest) {
+  const auth = authenticateRequest(req);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      { success: false, error_code: 'AUTH_FAILED', message: auth.error },
+      { status: 401 }
+    );
+  }
+
+  const { searchParams } = req.nextUrl;
+  let orderId = searchParams.get('id') || searchParams.get('order_id');
+
+  if (!orderId) {
+    try {
+      const body = await req.json();
+      orderId = body.order_id || body.id;
+    } catch {
+      // Body not provided
+    }
+  }
+
+  if (!orderId) {
+    return NextResponse.json(
+      { success: false, message: 'Order ID is required to delete an order' },
+      { status: 400 }
+    );
+  }
+
+  const deleted = await deleteOrder(orderId);
+  if (!deleted) {
+    return NextResponse.json(
+      { success: false, message: `Order '${orderId}' not found` },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    message: `Order '${orderId}' deleted successfully.`
+  });
 }
