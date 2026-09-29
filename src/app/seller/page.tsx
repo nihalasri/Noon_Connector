@@ -50,10 +50,21 @@ export default function SellerPortalPage() {
       setOriginUrl(window.location.origin);
     }
     loadAllData();
+
+    // Auto-refresh orders, customers, and database status every 8 seconds
+    const interval = setInterval(() => {
+      loadAllData(false);
+    }, 8000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  const loadAllData = async () => {
-    setIsLoading(true);
+  useEffect(() => {
+    loadAllData(false);
+  }, [activeTab]);
+
+  const loadAllData = async (showSpinner: boolean = true) => {
+    if (showSpinner) setIsLoading(true);
     try {
       // 1. Fetch Orders
       const ordersRes = await fetch('/api/v1/orders?demo=true');
@@ -100,7 +111,7 @@ export default function SellerPortalPage() {
     } catch (err) {
       console.error('Failed to load seller portal data', err);
     } finally {
-      setIsLoading(false);
+      if (showSpinner) setIsLoading(false);
     }
   };
 
@@ -1719,7 +1730,7 @@ info syncResponse;`}
 
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button
-                    onClick={loadAllData}
+                    onClick={() => loadAllData()}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
