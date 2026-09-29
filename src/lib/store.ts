@@ -101,8 +101,8 @@ export async function getWebhookLogs(): Promise<WebhookLog[]> {
   return getWebhookLogsFromDb();
 }
 
-export async function dispatchWebhook(event: string, payload: any): Promise<WebhookLog | null> {
-  return dispatchWebhookFromDb(event, payload);
+export async function dispatchWebhook(event: string, payload: any, overrideUrl?: string): Promise<WebhookLog | null> {
+  return dispatchWebhookFromDb(event, payload, overrideUrl);
 }
 
 // Database stats & reset

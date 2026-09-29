@@ -11,13 +11,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let bodyUrl = '';
+  try {
+    const body = await req.json();
+    if (body && typeof body.url === 'string') {
+      bodyUrl = body.url.trim();
+    }
+  } catch {
+    // Body is empty or not JSON
+  }
+
   const config = await getSellerConfig();
-  if (!config.webhook_url) {
+  const targetUrl = (bodyUrl && bodyUrl.startsWith('http')) ? bodyUrl : config.webhook_url;
+
+  if (!targetUrl) {
     return NextResponse.json(
       {
         success: false,
         error_code: 'NO_WEBHOOK_URL',
-        message: 'No webhook URL configured. Please set a Zoho CRM webhook endpoint in the Seller Lab Developer settings.'
+        message: 'No webhook URL configured or provided. Please enter a Zoho CRM webhook endpoint URL.'
       },
       { status: 400 }
     );
@@ -45,13 +57,13 @@ export async function POST(req: NextRequest) {
     }
   };
 
-  const logResult = await dispatchWebhook('order.created', testPayload);
+  const logResult = await dispatchWebhook('order.created', testPayload, targetUrl);
 
   return NextResponse.json({
     success: true,
     message: logResult?.success
-      ? `Test webhook sent to ${config.webhook_url} with HTTP ${logResult.status_code}`
-      : `Test webhook dispatched to ${config.webhook_url} (HTTP ${logResult?.status_code || 'error'})`,
+      ? `Test webhook sent to ${targetUrl} with HTTP ${logResult.status_code}`
+      : `Test webhook dispatched to ${targetUrl} (HTTP ${logResult?.status_code || 'error'})`,
     result: logResult
   });
 }

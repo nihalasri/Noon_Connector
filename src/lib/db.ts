@@ -1148,13 +1148,18 @@ export async function saveWebhookLogInDb(log: WebhookLog): Promise<void> {
   }
 }
 
-export async function dispatchWebhookFromDb(event: string, payload: any): Promise<WebhookLog | null> {
+export async function dispatchWebhookFromDb(
+  event: string, 
+  payload: any, 
+  overrideUrl?: string
+): Promise<WebhookLog | null> {
   const config = await getSellerConfigFromDb();
-  if (!config.webhook_url || !config.webhook_url.startsWith('http')) {
+  const targetUrl = (overrideUrl && overrideUrl.startsWith('http')) ? overrideUrl : config.webhook_url;
+  if (!targetUrl || !targetUrl.startsWith('http')) {
     return null;
   }
 
-  if (config.webhook_events && !config.webhook_events.includes(event)) {
+  if (!overrideUrl && config.webhook_events && !config.webhook_events.includes(event)) {
     return null;
   }
 
@@ -1164,7 +1169,7 @@ export async function dispatchWebhookFromDb(event: string, payload: any): Promis
   let success = false;
 
   try {
-    const res = await fetch(config.webhook_url, {
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1189,7 +1194,7 @@ export async function dispatchWebhookFromDb(event: string, payload: any): Promis
   const logEntry: WebhookLog = {
     id: logId,
     event,
-    url: config.webhook_url,
+    url: targetUrl,
     status_code: statusCode,
     payload,
     response_text: responseText.slice(0, 500),

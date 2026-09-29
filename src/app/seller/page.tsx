@@ -29,7 +29,10 @@ export default function SellerPortalPage() {
   // Webhook settings form state
   const [webhookUrlInput, setWebhookUrlInput] = useState<string>('');
   const [isSavingWebhook, setIsSavingWebhook] = useState<boolean>(false);
+  const [saveWebhookStatus, setSaveWebhookStatus] = useState<{ loading: boolean; message?: string; success?: boolean } | null>(null);
   const [testWebhookStatus, setTestWebhookStatus] = useState<{ loading: boolean; message?: string; success?: boolean } | null>(null);
+  const isWebhookDirtyRef = React.useRef<boolean>(false);
+  const isWebhookInitializedRef = React.useRef<boolean>(false);
 
   // Stock edit state
   const [editingStockSku, setEditingStockSku] = useState<string | null>(null);
@@ -51,7 +54,7 @@ export default function SellerPortalPage() {
     }
     loadAllData();
 
-    // Auto-refresh orders, customers, and database status every 8 seconds
+    // Auto-refresh dynamic data every 8 seconds
     const interval = setInterval(() => {
       loadAllData(false);
     }, 8000);
@@ -66,47 +69,42 @@ export default function SellerPortalPage() {
   const loadAllData = async (showSpinner: boolean = true) => {
     if (showSpinner) setIsLoading(true);
     try {
-      // 1. Fetch Orders
-      const ordersRes = await fetch('/api/v1/orders?demo=true');
-      const ordersJson = await ordersRes.json();
-      if (ordersJson.success) {
-        setOrders(ordersJson.data.orders);
+      const [ordersRes, catalogRes, configRes, logsRes, custRes, dbRes] = await Promise.allSettled([
+        fetch('/api/v1/orders?demo=true').then(r => r.json()),
+        fetch('/api/v1/catalog?demo=true').then(r => r.json()),
+        fetch('/api/v1/seller/config?demo=true').then(r => r.json()),
+        fetch('/api/v1/webhooks/logs?demo=true').then(r => r.json()),
+        fetch('/api/v1/customers?demo=true').then(r => r.json()),
+        fetch('/api/v1/db/status').then(r => r.json())
+      ]);
+
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.success) {
+        setOrders(ordersRes.value.data.orders);
       }
 
-      // 2. Fetch Catalog
-      const catalogRes = await fetch('/api/v1/catalog?demo=true');
-      const catalogJson = await catalogRes.json();
-      if (catalogJson.success) {
-        setProducts(catalogJson.data.products);
+      if (catalogRes.status === 'fulfilled' && catalogRes.value?.success) {
+        setProducts(catalogRes.value.data.products);
       }
 
-      // 3. Fetch Seller Config
-      const configRes = await fetch('/api/v1/seller/config?demo=true');
-      const configJson = await configRes.json();
-      if (configJson.success) {
-        setConfig(configJson.config);
-        setWebhookUrlInput(configJson.config.webhook_url || '');
+      if (configRes.status === 'fulfilled' && configRes.value?.success) {
+        setConfig(configRes.value.config);
+        // Only initialize input on initial load if user has not typed into it
+        if (!isWebhookInitializedRef.current && !isWebhookDirtyRef.current) {
+          setWebhookUrlInput(configRes.value.config.webhook_url || '');
+          isWebhookInitializedRef.current = true;
+        }
       }
 
-      // 4. Fetch Webhook Logs
-      const logsRes = await fetch('/api/v1/webhooks/logs?demo=true');
-      const logsJson = await logsRes.json();
-      if (logsJson.success) {
-        setWebhookLogs(logsJson.logs);
+      if (logsRes.status === 'fulfilled' && logsRes.value?.success) {
+        setWebhookLogs(logsRes.value.logs);
       }
 
-      // 5. Fetch Customers
-      const custRes = await fetch('/api/v1/customers?demo=true');
-      const custJson = await custRes.json();
-      if (custJson.success) {
-        setCustomers(custJson.data.customers);
+      if (custRes.status === 'fulfilled' && custRes.value?.success) {
+        setCustomers(custRes.value.data.customers);
       }
 
-      // 6. Fetch Database Status
-      const dbRes = await fetch('/api/v1/db/status');
-      const dbJson = await dbRes.json();
-      if (dbJson.success) {
-        setDbStatus(dbJson.database);
+      if (dbRes.status === 'fulfilled' && dbRes.value?.success) {
+        setDbStatus(dbRes.value.database);
       }
     } catch (err) {
       console.error('Failed to load seller portal data', err);
@@ -178,31 +176,61 @@ export default function SellerPortalPage() {
   const handleSaveWebhookSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingWebhook(true);
+    setSaveWebhookStatus({ loading: true });
     try {
+      const trimmedUrl = webhookUrlInput.trim();
       const res = await fetch('/api/v1/seller/config?demo=true', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ webhook_url: webhookUrlInput })
+        body: JSON.stringify({ webhook_url: trimmedUrl })
       });
       const data = await res.json();
       if (data.success) {
         setConfig(data.config);
-        alert('Webhook settings saved successfully!');
+        setWebhookUrlInput(data.config.webhook_url || '');
+        isWebhookDirtyRef.current = false;
+        isWebhookInitializedRef.current = true;
+        setSaveWebhookStatus({
+          loading: false,
+          success: true,
+          message: '✅ Webhook URL saved successfully!'
+        });
+        setTimeout(() => setSaveWebhookStatus(null), 4000);
       } else {
-        alert('Failed to save webhook settings: ' + data.message);
+        setSaveWebhookStatus({
+          loading: false,
+          success: false,
+          message: data.message || 'Failed to save webhook settings'
+        });
       }
     } catch (err: any) {
-      alert('Error saving webhook: ' + err.message);
+      setSaveWebhookStatus({
+        loading: false,
+        success: false,
+        message: 'Error saving webhook: ' + err.message
+      });
     } finally {
       setIsSavingWebhook(false);
     }
   };
 
   const handleSendTestWebhook = async () => {
+    const targetUrl = webhookUrlInput.trim();
+    if (!targetUrl) {
+      setTestWebhookStatus({
+        loading: false,
+        success: false,
+        message: 'Please enter a webhook URL first.'
+      });
+      return;
+    }
+
     setTestWebhookStatus({ loading: true });
     try {
       const res = await fetch('/api/v1/webhooks/test?demo=true', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: targetUrl })
       });
       const data = await res.json();
       if (data.success) {
@@ -211,7 +239,7 @@ export default function SellerPortalPage() {
           success: true,
           message: data.message
         });
-        loadAllData();
+        loadAllData(false);
       } else {
         setTestWebhookStatus({
           loading: false,
@@ -253,6 +281,8 @@ export default function SellerPortalPage() {
   const handleResetData = async () => {
     if (confirm('Are you sure you want to reset all mock orders and products back to seed state?')) {
       await fetch('/api/v1/reset', { method: 'POST' });
+      isWebhookInitializedRef.current = false;
+      isWebhookDirtyRef.current = false;
       loadAllData();
     }
   };
@@ -1241,7 +1271,13 @@ export default function SellerPortalPage() {
                       type="url"
                       placeholder="https://crm.zoho.com/crm/WebHook?id=... or Deluge webhook URL"
                       value={webhookUrlInput}
-                      onChange={(e) => setWebhookUrlInput(e.target.value)}
+                      onChange={(e) => {
+                        isWebhookDirtyRef.current = true;
+                        setWebhookUrlInput(e.target.value);
+                      }}
+                      onFocus={() => {
+                        isWebhookDirtyRef.current = true;
+                      }}
                       style={{
                         width: '100%',
                         padding: '10px 14px',
@@ -1257,7 +1293,7 @@ export default function SellerPortalPage() {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button
                       type="submit"
                       disabled={isSavingWebhook}
@@ -1285,6 +1321,16 @@ export default function SellerPortalPage() {
                       <Send size={14} />
                       {testWebhookStatus?.loading ? 'Sending Test...' : 'Send Test Webhook to Zoho'}
                     </button>
+
+                    {saveWebhookStatus && (
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        color: saveWebhookStatus.success ? '#4ade80' : '#f87171'
+                      }}>
+                        {saveWebhookStatus.message}
+                      </span>
+                    )}
 
                     {testWebhookStatus && (
                       <span style={{
