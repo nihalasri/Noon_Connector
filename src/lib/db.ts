@@ -989,12 +989,16 @@ export async function createOrderInDb(data: {
   const store = getMemoryStore();
   store.orders.unshift(newOrder);
 
-  // Dispatch background webhook
-  dispatchWebhookFromDb('order.created', {
-    event: 'order.created',
-    timestamp: newOrder.created_at,
-    data: newOrder
-  }).catch(err => console.error('Webhook dispatch error:', err));
+  // Dispatch webhook — await it so Vercel doesn't kill the function mid-flight
+  try {
+    await dispatchWebhookFromDb('order.created', {
+      event: 'order.created',
+      timestamp: newOrder.created_at,
+      data: newOrder
+    });
+  } catch (err) {
+    console.error('Webhook dispatch error:', err);
+  }
 
   return newOrder;
 }
@@ -1034,13 +1038,17 @@ export async function updateOrderStatusInDb(
 
       const updated = await getOrderByIdFromDb(orderId);
       if (updated) {
-        dispatchWebhookFromDb('order.status_updated', {
-          event: 'order.status_updated',
-          order_id: updated.order_id,
-          new_status: newStatus,
-          timestamp: updated.updated_at,
-          data: updated
-        }).catch(err => console.error('Webhook status dispatch error:', err));
+        try {
+          await dispatchWebhookFromDb('order.status_updated', {
+            event: 'order.status_updated',
+            order_id: updated.order_id,
+            new_status: newStatus,
+            timestamp: updated.updated_at,
+            data: updated
+          });
+        } catch (err) {
+          console.error('Webhook status dispatch error:', err);
+        }
         return updated;
       }
     } catch (err) {
@@ -1061,13 +1069,17 @@ export async function updateOrderStatusInDb(
   if (newStatus === 'SHIPPED') order.fulfillment.shipped_at = now;
   if (newStatus === 'DELIVERED') order.fulfillment.delivered_at = now;
 
-  dispatchWebhookFromDb('order.status_updated', {
-    event: 'order.status_updated',
-    order_id: order.order_id,
-    new_status: newStatus,
-    timestamp: order.updated_at,
-    data: order
-  }).catch(err => console.error('Webhook status dispatch error:', err));
+  try {
+    await dispatchWebhookFromDb('order.status_updated', {
+      event: 'order.status_updated',
+      order_id: order.order_id,
+      new_status: newStatus,
+      timestamp: order.updated_at,
+      data: order
+    });
+  } catch (err) {
+    console.error('Webhook status dispatch error (memory fallback):', err);
+  }
 
   return order;
 }
@@ -1321,28 +1333,43 @@ export async function dispatchWebhookFromDb(
   let statusCode = 0;
   let responseText = '';
   let success = false;
+  let attempts = 0;
 
-  try {
-    const res = await fetch(targetUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Noon-Webhook-Dispatcher/2.0',
-        'X-Noon-Event': event,
-        'X-Noon-Seller-Id': config.seller_identifier,
-        'X-Noon-Signature': config.webhook_secret ? `sha256=${config.webhook_secret}` : ''
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(6000)
-    });
+  const MAX_RETRIES = 3;
+  const TIMEOUT_MS = 30000; // 30s — Zoho Deluge cold start + 5-6 CRM calls can take 5-15s
 
-    statusCode = res.status;
-    responseText = await res.text().catch(() => '');
-    success = res.ok;
-  } catch (err: any) {
-    statusCode = 500;
-    responseText = err?.message || 'Connection failed';
-    success = false;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    attempts = attempt;
+    try {
+      const res = await fetch(targetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Noon-Webhook-Dispatcher/2.0',
+          'X-Noon-Event': event,
+          'X-Noon-Seller-Id': config.seller_identifier,
+          'X-Noon-Signature': config.webhook_secret ? `sha256=${config.webhook_secret}` : '',
+          'X-Noon-Attempt': String(attempt)
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(TIMEOUT_MS)
+      });
+
+      statusCode = res.status;
+      responseText = await res.text().catch(() => '');
+      success = res.ok;
+
+      if (success) break; // Got 2xx — stop retrying
+    } catch (err: any) {
+      statusCode = 500;
+      responseText = `Attempt ${attempt}/${MAX_RETRIES}: ${err?.message || 'Connection failed'}`;
+      success = false;
+    }
+
+    // Don't sleep after the last attempt
+    if (attempt < MAX_RETRIES) {
+      await new Promise(resolve => setTimeout(resolve, attempt * 2000)); // 2s, 4s backoff
+    }
   }
 
   const logEntry: WebhookLog = {
@@ -1351,7 +1378,7 @@ export async function dispatchWebhookFromDb(
     url: targetUrl,
     status_code: statusCode,
     payload,
-    response_text: responseText.slice(0, 500),
+    response_text: (responseText + (attempts > 1 ? ` [${attempts} attempts]` : '')).slice(0, 500),
     created_at: new Date().toISOString(),
     success
   };

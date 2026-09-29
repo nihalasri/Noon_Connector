@@ -3,6 +3,8 @@ import { authenticateRequest } from '@/lib/auth';
 import { updateOrderStatus, getOrderById } from '@/lib/store';
 import { OrderStatus } from '@/lib/types';
 
+export const maxDuration = 60; // Allow webhook dispatch + Zoho Deluge cold start to complete
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> }

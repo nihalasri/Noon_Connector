@@ -4,6 +4,7 @@ import { getOrders, createOrder, deleteOrder } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const maxDuration = 60; // Allow webhook dispatch + Zoho Deluge cold start to complete
 
 export async function GET(req: NextRequest) {
   const auth = authenticateRequest(req);

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { getSellerConfig, updateSellerConfig, dispatchWebhook, getOrders } from '@/lib/store';
 
+export const maxDuration = 60; // Allow webhook dispatch + Zoho Deluge cold start to complete
+
 export async function POST(req: NextRequest) {
   const auth = authenticateRequest(req);
   if (!auth.authenticated) {
