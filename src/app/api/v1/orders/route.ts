@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1', 10);
   const limit = parseInt(searchParams.get('limit') || '50', 10);
 
-  const result = getOrders({ status, page, limit });
+  const result = await getOrders({ status, page, limit });
 
   return NextResponse.json({
     success: true,

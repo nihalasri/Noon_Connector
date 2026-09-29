@@ -22,6 +22,29 @@ export interface CustomerDetails {
   postal_code?: string;
 }
 
+export interface CustomerRecord extends CustomerDetails {
+  id: string;
+  total_orders: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbStatusInfo {
+  isConfigured: boolean;
+  isConnected: boolean;
+  provider: 'vercel_postgres' | 'local_fallback';
+  databaseName?: string;
+  host?: string;
+  counts: {
+    customers: number;
+    orders: number;
+    products: number;
+    sellers: number;
+    webhook_logs: number;
+  };
+  message?: string;
+}
+
 export interface OrderTotals {
   subtotal: number;
   vat_rate: number; // e.g. 0.05 (5%)

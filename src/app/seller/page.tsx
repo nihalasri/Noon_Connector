@@ -6,18 +6,22 @@ import {
   Building2, Package, ShoppingCart, Key, Webhook, Code, Play, 
   RefreshCw, Check, Copy, ExternalLink, Printer, CheckCircle2,
   AlertCircle, ChevronRight, Download, Send, ArrowUpRight, Plus,
-  Sliders, Search, Filter, ShieldCheck, Database, Layers
+  Sliders, Search, Filter, ShieldCheck, Database, Layers, Users, Server, HardDrive
 } from 'lucide-react';
-import { Order, Product, SellerConfig, WebhookLog, OrderStatus } from '@/lib/types';
+import { Order, Product, SellerConfig, WebhookLog, OrderStatus, CustomerRecord, DbStatusInfo } from '@/lib/types';
 
 export default function SellerPortalPage() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'catalog' | 'developer' | 'webhooks' | 'zoho' | 'sandbox'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'catalog' | 'customers' | 'database' | 'developer' | 'webhooks' | 'zoho' | 'sandbox'>('dashboard');
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [config, setConfig] = useState<SellerConfig | null>(null);
   const [webhookLogs, setWebhookLogs] = useState<WebhookLog[]>([]);
+  const [dbStatus, setDbStatus] = useState<DbStatusInfo | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isCheckingDb, setIsCheckingDb] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [customerSearch, setCustomerSearch] = useState<string>('');
 
   // Filter state for orders
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('ALL');
@@ -79,10 +83,41 @@ export default function SellerPortalPage() {
       if (logsJson.success) {
         setWebhookLogs(logsJson.logs);
       }
+
+      // 5. Fetch Customers
+      const custRes = await fetch('/api/v1/customers?demo=true');
+      const custJson = await custRes.json();
+      if (custJson.success) {
+        setCustomers(custJson.data.customers);
+      }
+
+      // 6. Fetch Database Status
+      const dbRes = await fetch('/api/v1/db/status');
+      const dbJson = await dbRes.json();
+      if (dbJson.success) {
+        setDbStatus(dbJson.database);
+      }
     } catch (err) {
       console.error('Failed to load seller portal data', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTestDatabase = async () => {
+    setIsCheckingDb(true);
+    try {
+      const res = await fetch('/api/v1/db/init', { method: 'POST' });
+      const json = await res.json();
+      if (json.status) {
+        setDbStatus(json.status);
+      }
+      alert(json.ready ? '✅ Vercel Postgres tables verified & synchronized!' : json.message || 'Database status updated.');
+      loadAllData();
+    } catch (err: any) {
+      alert('Error testing database: ' + err.message);
+    } finally {
+      setIsCheckingDb(false);
     }
   };
 
@@ -303,6 +338,28 @@ export default function SellerPortalPage() {
 
         {/* Header Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Vercel Database Status Pill */}
+          <button
+            onClick={() => setActiveTab('database')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '12px',
+              fontWeight: '700',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              background: dbStatus?.isConnected ? '#0f291e' : '#292010',
+              color: dbStatus?.isConnected ? '#4ade80' : '#fbbf24',
+              border: `1px solid ${dbStatus?.isConnected ? '#166534' : '#784310'}`,
+              cursor: 'pointer'
+            }}
+            title="Inspect Vercel Database Status"
+          >
+            <Database size={13} />
+            <span>{dbStatus?.isConnected ? 'Vercel Postgres: Active' : 'DB: Local Fallback'}</span>
+          </button>
+
           <button
             onClick={handleResetData}
             style={{
@@ -314,7 +371,8 @@ export default function SellerPortalPage() {
               color: '#c0c8d6',
               padding: '6px 12px',
               borderRadius: '6px',
-              border: '1px solid #333a47'
+              border: '1px solid #333a47',
+              cursor: 'pointer'
             }}
           >
             <RefreshCw size={13} /> Reset Demo Data
@@ -423,10 +481,59 @@ export default function SellerPortalPage() {
             <ShoppingCart size={17} /> Catalog & Stock
           </button>
 
+          <button
+            onClick={() => setActiveTab('customers')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              textAlign: 'left',
+              background: activeTab === 'customers' ? '#feee00' : 'transparent',
+              color: activeTab === 'customers' ? '#000' : '#c0c8d6',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Users size={17} /> Customers ({customers.length})
+          </button>
+
           <div style={{ height: '1px', background: '#282c35', margin: '8px 0' }} />
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#687284', padding: '4px 14px', textTransform: 'uppercase' }}>
             Integration & APIs
           </div>
+
+          <button
+            onClick={() => setActiveTab('database')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: '600',
+              textAlign: 'left',
+              background: activeTab === 'database' ? '#feee00' : 'transparent',
+              color: activeTab === 'database' ? '#000' : '#c0c8d6',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Database size={17} /> Vercel Database
+            <span style={{
+              marginLeft: 'auto',
+              background: dbStatus?.isConnected ? '#14532d' : '#713f12',
+              color: dbStatus?.isConnected ? '#4ade80' : '#fde047',
+              fontSize: '10px',
+              fontWeight: '700',
+              padding: '1px 5px',
+              borderRadius: '4px'
+            }}>
+              {dbStatus?.isConnected ? 'SQL' : 'LOCAL'}
+            </span>
+          </button>
 
           <button
             onClick={() => setActiveTab('developer')}
@@ -1593,6 +1700,406 @@ info syncResponse;`}
                     </pre>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: CUSTOMERS */}
+          {activeTab === 'customers' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                <div>
+                  <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Users size={24} style={{ color: '#feee00' }} /> Customer Directory & CRM Profiles
+                  </h1>
+                  <p style={{ fontSize: '14px', color: '#9aa5b8' }}>
+                    Stored customer details, shipping destinations, contact numbers, and purchase frequency from Vercel Database.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={loadAllData}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '12px',
+                      background: '#242933',
+                      color: '#c0c8d6',
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid #333a47',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <RefreshCw size={14} /> Refresh Customers
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Bar */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                  <div style={{ fontSize: '12px', color: '#8c95a6', fontWeight: '600' }}>TOTAL CUSTOMERS</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#feee00', marginTop: '6px' }}>
+                    {customers.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#4ade80', marginTop: '4px' }}>Persisted in noon_customers table</div>
+                </div>
+
+                <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                  <div style={{ fontSize: '12px', color: '#8c95a6', fontWeight: '600' }}>TOTAL ORDERS PLACED</div>
+                  <div style={{ fontSize: '24px', fontWeight: '800', color: '#60a5fa', marginTop: '6px' }}>
+                    {orders.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#8c95a6', marginTop: '4px' }}>Linked via customer email & ID</div>
+                </div>
+
+                <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                  <div style={{ fontSize: '12px', color: '#8c95a6', fontWeight: '600' }}>DATABASE STATUS</div>
+                  <div style={{ fontSize: '18px', fontWeight: '800', color: dbStatus?.isConnected ? '#4ade80' : '#fbbf24', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: dbStatus?.isConnected ? '#4ade80' : '#fbbf24', display: 'inline-block' }} />
+                    {dbStatus?.isConnected ? 'Vercel Postgres' : 'Local Fallback'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#8c95a6', marginTop: '4px' }}>
+                    {dbStatus?.isConnected ? 'Neon Cloud Serverless' : 'In-memory persistent singleton'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter & Search Bar */}
+              <div style={{
+                background: '#15171d',
+                border: '1px solid #282c35',
+                borderRadius: '10px',
+                padding: '14px 18px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <Search size={16} style={{ color: '#687284' }} />
+                <input
+                  type="text"
+                  placeholder="Search customer by name, email, phone, or city..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    outline: 'none',
+                    color: '#fff',
+                    fontSize: '13px',
+                    width: '100%'
+                  }}
+                />
+                {customerSearch && (
+                  <button
+                    onClick={() => setCustomerSearch('')}
+                    style={{ background: 'transparent', border: 'none', color: '#8c95a6', cursor: 'pointer', fontSize: '12px' }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Customers Table */}
+              <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#121418', borderBottom: '1px solid #282c35', color: '#8c95a6', fontSize: '11px', textTransform: 'uppercase' }}>
+                      <th style={{ padding: '14px 18px' }}>Customer Name</th>
+                      <th style={{ padding: '14px 18px' }}>Contact Details</th>
+                      <th style={{ padding: '14px 18px' }}>Shipping Address</th>
+                      <th style={{ padding: '14px 18px', textAlign: 'center' }}>Total Orders</th>
+                      <th style={{ padding: '14px 18px' }}>Registered At</th>
+                      <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customers
+                      .filter(c => {
+                        if (!customerSearch) return true;
+                        const s = customerSearch.toLowerCase();
+                        return (
+                          c.name.toLowerCase().includes(s) ||
+                          c.email.toLowerCase().includes(s) ||
+                          c.phone.toLowerCase().includes(s) ||
+                          c.city.toLowerCase().includes(s)
+                        );
+                      })
+                      .map((cust) => (
+                        <tr key={cust.id || cust.email} style={{ borderBottom: '1px solid #20242c' }}>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ fontWeight: '700', color: '#ffffff' }}>{cust.name}</div>
+                            <div style={{ fontSize: '11px', color: '#687284', fontFamily: 'monospace' }}>ID: {cust.id}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px' }}>
+                            <div style={{ color: '#c0c8d6' }}>{cust.email}</div>
+                            <div style={{ fontSize: '11px', color: '#8c95a6' }}>{cust.phone}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px', color: '#c0c8d6' }}>
+                            <div>{cust.address_line1}</div>
+                            <div style={{ fontSize: '11px', color: '#8c95a6' }}>{cust.city}, {cust.country} {cust.postal_code ? `(${cust.postal_code})` : ''}</div>
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'center' }}>
+                            <span style={{
+                              background: '#1c2438',
+                              color: '#60a5fa',
+                              padding: '3px 10px',
+                              borderRadius: '12px',
+                              fontWeight: '700',
+                              fontSize: '12px'
+                            }}>
+                              {cust.total_orders || 1}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 18px', color: '#8c95a6', fontSize: '12px' }}>
+                            {new Date(cust.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </td>
+                          <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => {
+                                setOrderStatusFilter('ALL');
+                                setActiveTab('orders');
+                              }}
+                              style={{
+                                background: '#242933',
+                                border: '1px solid #333a47',
+                                color: '#feee00',
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              View Orders
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {customers.length === 0 && (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#8c95a6' }}>
+                          No customer records found. Place an order on the Noon Storefront to register customer details.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: VERCEL DATABASE */}
+          {activeTab === 'database' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                <div>
+                  <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Database size={24} style={{ color: '#feee00' }} /> Vercel Database & Schema Explorer
+                  </h1>
+                  <p style={{ fontSize: '14px', color: '#9aa5b8' }}>
+                    Postgres storage powering both Noon Customer Storefront and Seller Lab operations.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={handleTestDatabase}
+                    disabled={isCheckingDb}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '12px',
+                      background: '#feee00',
+                      color: '#000',
+                      fontWeight: '700',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <RefreshCw size={14} className={isCheckingDb ? 'animate-spin' : ''} />
+                    {isCheckingDb ? 'Checking...' : 'Test Connection & Sync'}
+                  </button>
+
+                  <button
+                    onClick={handleResetData}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '12px',
+                      background: '#242933',
+                      color: '#c0c8d6',
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid #333a47',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Re-seed Tables
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Alert Card */}
+              <div style={{
+                background: dbStatus?.isConnected ? 'linear-gradient(135deg, #102a1c 0%, #151820 100%)' : 'linear-gradient(135deg, #2a2210 0%, #151820 100%)',
+                border: `1px solid ${dbStatus?.isConnected ? '#1b4d2e' : '#594411'}`,
+                borderRadius: '12px',
+                padding: '24px',
+                marginBottom: '28px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Server size={22} style={{ color: dbStatus?.isConnected ? '#4ade80' : '#fbbf24' }} />
+                    <span style={{ fontSize: '18px', fontWeight: '800', color: '#fff' }}>
+                      {dbStatus?.isConnected ? 'Vercel Postgres (Neon Serverless) Active' : 'Local Fallback Storage Active'}
+                    </span>
+                  </div>
+                  <span style={{
+                    background: dbStatus?.isConnected ? '#14532d' : '#713f12',
+                    color: dbStatus?.isConnected ? '#4ade80' : '#fde047',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '800'
+                  }}>
+                    {dbStatus?.isConnected ? 'CONNECTED' : 'LOCAL EMULATION'}
+                  </span>
+                </div>
+
+                <p style={{ color: '#c5d0e0', fontSize: '13px', lineHeight: '1.6', marginBottom: '16px' }}>
+                  {dbStatus?.message || (dbStatus?.isConnected
+                    ? 'All customer details, orders, seller settings, products, and webhook logs are securely synchronized with Vercel Postgres.'
+                    : 'The app is running on in-memory storage. When deployed to Vercel, attach a Vercel Postgres store in your dashboard or set POSTGRES_URL to persist cloud tables.')}
+                </p>
+
+                <div style={{ display: 'flex', gap: '24px', fontSize: '12px', color: '#9aa5b8', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px' }}>
+                  <div>
+                    <span style={{ color: '#687284' }}>Provider: </span>
+                    <strong style={{ color: '#fff' }}>{dbStatus?.provider === 'vercel_postgres' ? 'Vercel Postgres (Neon)' : 'In-Memory Singleton'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#687284' }}>Host: </span>
+                    <strong style={{ color: '#fff', fontFamily: 'monospace' }}>{dbStatus?.host || 'localhost'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#687284' }}>Database: </span>
+                    <strong style={{ color: '#fff' }}>{dbStatus?.databaseName || 'noon_emulator'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6 Database Tables Grid */}
+              <div style={{ marginBottom: '28px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#fff', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HardDrive size={18} style={{ color: '#feee00' }} /> Synchronized Database Tables
+                </h2>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                  {/* Table 1: Customers */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_customers</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        {dbStatus?.counts.customers ?? customers.length} rows
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      Customer profiles, names, email addresses, UAE/KSA phone numbers, and delivery addresses.
+                    </div>
+                  </div>
+
+                  {/* Table 2: Sellers */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_sellers</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        {dbStatus?.counts.sellers ?? 1} row
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      Seller Lab configuration, API tokens, Zoho CRM webhook secrets, and legal entity details.
+                    </div>
+                  </div>
+
+                  {/* Table 3: Products */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_products</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        {dbStatus?.counts.products ?? products.length} rows
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      Noon Marketplace catalog items, barcodes, categories, prices, and live inventory stock.
+                    </div>
+                  </div>
+
+                  {/* Table 4: Orders */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_orders</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        {dbStatus?.counts.orders ?? orders.length} rows
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      Marketplace orders, payment methods (Card/COD), order status, and Noon Express AWB tracking.
+                    </div>
+                  </div>
+
+                  {/* Table 5: Order Items */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_order_items</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        Active
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      Normalized line items for each order, containing ordered SKU, title, unit price, and quantities.
+                    </div>
+                  </div>
+
+                  {/* Table 6: Webhook Logs */}
+                  <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontFamily: 'monospace', color: '#feee00', fontWeight: '700', fontSize: '13px' }}>noon_webhook_logs</span>
+                      <span style={{ background: '#242933', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '700' }}>
+                        {dbStatus?.counts.webhook_logs ?? webhookLogs.length} rows
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#8c95a6', lineHeight: '1.5' }}>
+                      HTTP audit logs for webhook dispatches sent to Zoho CRM or custom seller notification endpoints.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vercel Postgres Setup Instructions */}
+              <div style={{ background: '#15171d', border: '1px solid #282c35', borderRadius: '10px', padding: '24px' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginBottom: '12px' }}>
+                  ☁️ How to Connect Vercel Postgres (2 Minutes)
+                </h3>
+                <ol style={{ paddingLeft: '20px', fontSize: '13px', color: '#c0c8d6', lineHeight: '1.8' }}>
+                  <li>Deploy this project to your Vercel account or import from GitHub.</li>
+                  <li>In your Vercel Project Dashboard, navigate to the <strong>Storage</strong> tab.</li>
+                  <li>Click <strong>Create Database</strong> and select <strong>Postgres</strong> (powered by Neon).</li>
+                  <li>Click <strong>Connect to Project</strong>. Vercel automatically sets <code style={{ color: '#feee00', background: '#242933', padding: '2px 6px', borderRadius: '3px' }}>POSTGRES_URL</code>.</li>
+                  <li>The emulator will automatically run table creation and seed all initial products, orders, and seller credentials upon deployment!</li>
+                </ol>
               </div>
             </div>
           )}

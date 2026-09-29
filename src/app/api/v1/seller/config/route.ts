@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const config = getSellerConfig();
+  const config = await getSellerConfig();
   return NextResponse.json({
     success: true,
     config
@@ -29,7 +29,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const updated = updateSellerConfig({
+    const updated = await updateSellerConfig({
       webhook_url: body.webhook_url,
       webhook_secret: body.webhook_secret,
       webhook_events: body.webhook_events,

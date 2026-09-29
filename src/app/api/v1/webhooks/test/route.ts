@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const config = getSellerConfig();
+  const config = await getSellerConfig();
   if (!config.webhook_url) {
     return NextResponse.json(
       {
@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const orders = getOrders({ limit: 1 }).orders;
-  const sampleOrder = orders[0] || null;
+  const orderResult = await getOrders({ limit: 1 });
+  const sampleOrder = orderResult.orders[0] || null;
 
   const testPayload = {
     event: 'order.created',

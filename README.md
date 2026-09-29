@@ -50,12 +50,35 @@ npm run dev
 
 ---
 
-## ☁️ Deploy to Vercel (1-Click)
+## ☁️ Deploy to Vercel with Vercel Database (Postgres / Neon)
 
 1. Push this repository to GitHub.
-2. Import the repo at [vercel.com/new](https://vercel.com/new).
-3. Click **Deploy**. No special environment variables are needed!
-4. Use your Vercel URL (`https://your-app.vercel.app`) as the `noon_base_url` in Zoho Sigma!
+2. Import the repo at [vercel.com/new](https://vercel.com/new) and click **Deploy**.
+3. **Attach Vercel Postgres** (Stores all Customer & Seller data permanently):
+   - In your deployed project on Vercel, go to the **Storage** tab.
+   - Click **Create Database** -> Choose **Postgres** (powered by Neon Serverless).
+   - Click **Connect to Project** (`POSTGRES_URL` is configured automatically).
+   - Trigger a redeploy or visit `/seller` -> **Vercel Database** tab to verify connection!
+4. **Local Development with Vercel Database**:
+   - Link project and pull database credentials:
+     ```bash
+     npx vercel link
+     npx vercel env pull .env.local
+     ```
+   - If `POSTGRES_URL` is omitted, the app automatically runs in **zero-config local fallback mode** with an in-memory singleton.
+
+---
+
+## 🗄️ Database Architecture (Vercel Postgres)
+
+| Table Name | Owner Domain | Stored Details |
+| :--- | :--- | :--- |
+| `noon_customers` | Customer Side | Customer name, email, phone, city, UAE/KSA delivery address, total orders placed, registration timestamps |
+| `noon_sellers` | Seller Side | Seller ID (`noon_seller_uae_88921`), API Key, Project ID, store name, legal entity, VAT number, Zoho webhook settings |
+| `noon_products` | Seller Side | Marketplace catalog, Arabic titles, brands, categories, AED prices, stock inventory, barcode |
+| `noon_orders` | Customer + Seller | Customer order reference, payment method (Card/COD), order status (`PENDING` - `DELIVERED`), AWB tracking |
+| `noon_order_items` | Customer + Seller | Line items per order, ordered SKUs, unit prices, quantities, and item totals |
+| `noon_webhook_logs` | Seller Integration | Live audit log of webhook events dispatched to Zoho CRM with status codes and payloads |
 
 ---
 

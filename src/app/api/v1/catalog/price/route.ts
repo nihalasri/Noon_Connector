@@ -20,7 +20,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const existing = getProductBySku(body.sku);
+    const existing = await getProductBySku(body.sku);
     if (!existing) {
       return NextResponse.json(
         { success: false, message: `SKU ${body.sku} not found` },
@@ -28,7 +28,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const updated = updateProductPrice(body.sku, body.price);
+    const updated = await updateProductPrice(body.sku, body.price);
 
     return NextResponse.json({
       success: true,

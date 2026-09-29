@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const logs = getWebhookLogs();
+  const logs = await getWebhookLogs();
   return NextResponse.json({
     success: true,
     count: logs.length,

@@ -16,7 +16,7 @@ export async function PUT(
   }
 
   const { orderId } = await params;
-  const order = getOrderById(orderId);
+  const order = await getOrderById(orderId);
 
   if (!order) {
     return NextResponse.json(

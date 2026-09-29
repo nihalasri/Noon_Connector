@@ -37,9 +37,9 @@ export async function PUT(req: NextRequest) {
       if (!item.sku || typeof item.stock !== 'number') {
         continue;
       }
-      const existing = getProductBySku(item.sku);
+      const existing = await getProductBySku(item.sku);
       if (existing) {
-        const updated = updateProductStock(item.sku, item.stock);
+        const updated = await updateProductStock(item.sku, item.stock);
         results.push({
           sku: item.sku,
           updated: true,

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getSellerConfig } from './store';
+import { getSellerConfigSync } from './store';
 
 export interface AuthResult {
   authenticated: boolean;
@@ -8,7 +8,7 @@ export interface AuthResult {
 }
 
 export function authenticateRequest(req: NextRequest): AuthResult {
-  const config = getSellerConfig();
+  const config = getSellerConfigSync();
 
   // Allow bypass with demo=true or in development for easy browser inspection
   const searchParams = req.nextUrl.searchParams;

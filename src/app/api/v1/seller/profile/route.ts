@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const config = getSellerConfig();
+  const config = await getSellerConfig();
   return NextResponse.json({
     success: true,
     message: 'Noon Partner API connection established successfully.',

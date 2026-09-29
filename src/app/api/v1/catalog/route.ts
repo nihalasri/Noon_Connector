@@ -16,19 +16,10 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category');
   const search = searchParams.get('search')?.toLowerCase();
 
-  let products = getProducts();
-
-  if (category) {
-    products = products.filter(p => p.category.toLowerCase() === category.toLowerCase());
-  }
-  if (search) {
-    products = products.filter(
-      p =>
-        p.title.toLowerCase().includes(search) ||
-        p.sku.toLowerCase().includes(search) ||
-        p.brand.toLowerCase().includes(search)
-    );
-  }
+  const products = await getProducts({
+    category: category || undefined,
+    search: search || undefined
+  });
 
   return NextResponse.json({
     success: true,
@@ -76,7 +67,7 @@ export async function POST(req: NextRequest) {
       description: body.description || body.title
     };
 
-    const created = addProduct(newProduct);
+    const created = await addProduct(newProduct);
 
     return NextResponse.json({
       success: true,
